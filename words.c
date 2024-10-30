@@ -2,36 +2,44 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-
-//new and experimenting
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
-//  just place holder for me to remember
-// struct dirent {
-//     ino_t          d_ino;       /* inode number */
-//     off_t          d_off;       /* offset to the next dirent */
-//     unsigned short d_reclen;    /* length of this record */
-//     unsigned char  d_type;      /* type of file; not supported
-//                                    by all file system types */
-//     char           d_name[256]; /* filename */
-// };
+#define BUFSIZE 128
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
-int isFile(const char* name)
-{
-    DIR* directory = opendir(name);
+int get_entry_type(const char* path);
+void search_directory(char *dir_path);
+void read_text(char *dir_path);
+void count(char *dir_path);
 
-    if(directory != NULL)
-    {
-     closedir(directory);
-     //is a directory
-     return 0;
-    }
-    //is a file
-    return 1;
+int get_entry_type(const char *path) {
+    struct stat sbuf;
+    int r = stat(path, &sbuf);
+
+    if (r != 0) perror(path);
+
+    // 1 = regular file
+    // 2 = directory
+    if (S_ISREG(sbuf.st_mode)) {
+        if (DEBUG) printf("%s is a regular file\n", path);
+        return 1;
+    } else if (S_ISDIR(sbuf.st_mode)) {
+        if (DEBUG) printf("%s is a directory\n", path);
+        return 2;
+    } else
+        return -1;
 }
 
-void search_directory(const char *dir_path) {
+/**
+ * @brief Recursively traverse through directory
+ * 
+ * @param [in] dir_path directory to search through
+ */
+void search_directory(char *dir_path) {
     struct dirent *entry;
     DIR *dp = opendir(dir_path);
 
@@ -40,30 +48,81 @@ void search_directory(const char *dir_path) {
     }
 
     while ((entry = readdir(dp)) != NULL) {
-        // skip the . and .. entries
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            return;
+        // Skip the . and .. entries
+        if (strncmp(entry->d_name, ".", 1) == 0) {
+            continue;
         }
 
-        char full_path[1024];
-        //grab the full directory name---------dont know if this works entirely
-        strcat(dir_path, entry->d_name);
-        
+        char temp[1024];
+        strcpy(temp, dir_path);
+        strcat(temp, "/");
+        strcat(temp, entry->d_name);
 
-        // check if the entry is a directory
-        //for some reason DT_DIR and DT_REG not working for me so might look for another way to do this
-        if (isFile(dir_path) == 0) {
-            search_directory(full_path);
-            
-        // Check if the file ends with ".txt"
-        } else if (strstr(dir_path, ".txt") != NULL) {
-            // call wordcount or add the path to a place to all execute at once
+        int entry_type = get_entry_type(temp);
+
+        if (entry_type == 2) {
+            search_directory(temp);
+        } else if (entry_type == 1) {
+            if (strstr(entry->d_name, ".txt")) {
+                read_text(temp);
+            }
         }
     }
-
     closedir(dp);
 }
 
-int main(){
+void read_text(char *dir_path) {
+    int fd = open(dir_path, O_RDONLY);
+
+    if (fd < 0) {
+        perror(dir_path);
+        return;
+    }
+
+    char buf[BUFSIZE];
+    char *line = NULL;
+    int line_len = 0;
+    int bytes, seg_start;
+
+    while ((bytes = read(fd, buf, BUFSIZE)) > 0) {
+        if (DEBUG) printf("read %d bytes\n", bytes);
+        
+        int pos;
+        seg_start = 0;
+        for (pos = 0; pos < bytes; pos++) {
+            if (buf[pos] == '\n') {
+                int seg_len = pos - seg_start;
+                line = realloc(line, line_len + seg_len + 1);
+                memcpy(line + line_len, buf + seg_start, seg_len);
+                
+                line[line_len + seg_len] = '\0';
+
+                count(line);
+
+                seg_start = pos + 1;
+                line = NULL;
+                line_len = 0;
+            }
+        }
+        if (seg_start < pos) {
+            int seg_len = pos - seg_start;
+            line = realloc(line, line_len + seg_len + 1);
+            
+            memcpy(line + line_len, buf + seg_start, seg_len);
+            line_len += seg_len;
+            line[line_len] = '\0';
+        }
+    }
+    if (line) {
+        count(line);
+    }
+}
+
+void count(char *text) {
     
+}
+
+int main(int argc, char **argv) {
+    search_directory(argv[1]);
+    return EXIT_SUCCESS;
 }
