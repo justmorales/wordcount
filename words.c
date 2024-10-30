@@ -11,24 +11,26 @@
 #define DEBUG 0
 #endif
 
-int get_entry_type(const char* path);
-void search_directory(char *dir_path);
-void read_text(char *dir_path);
-void count(char *dir_path);
+char **words;
 
-int get_entry_type(const char *path) {
+int get_entry_type(const char* pathname);
+void search_directory(const char *pathname);
+void read_text(const char *pathname);
+void count(char *text);
+
+int get_entry_type(const char *pathname) {
     struct stat sbuf;
-    int r = stat(path, &sbuf);
+    int r = stat(pathname, &sbuf);
 
-    if (r != 0) perror(path);
+    if (r != 0) perror(pathname);
 
     // 1 = regular file
     // 2 = directory
     if (S_ISREG(sbuf.st_mode)) {
-        if (DEBUG) printf("%s is a regular file\n", path);
+        if (DEBUG) printf("%s is a regular file\n", pathname);
         return 1;
     } else if (S_ISDIR(sbuf.st_mode)) {
-        if (DEBUG) printf("%s is a directory\n", path);
+        if (DEBUG) printf("%s is a directory\n", pathname);
         return 2;
     } else
         return -1;
@@ -39,9 +41,9 @@ int get_entry_type(const char *path) {
  * 
  * @param [in] dir_path directory to search through
  */
-void search_directory(char *dir_path) {
+void search_directory(const char *pathname) {
     struct dirent *entry;
-    DIR *dp = opendir(dir_path);
+    DIR *dp = opendir(pathname);
 
     if (dp == NULL) {
         return;
@@ -54,28 +56,26 @@ void search_directory(char *dir_path) {
         }
 
         char temp[1024];
-        strcpy(temp, dir_path);
+        strcpy(temp, pathname);
         strcat(temp, "/");
         strcat(temp, entry->d_name);
 
         int entry_type = get_entry_type(temp);
 
-        if (entry_type == 2) {
+        if (entry_type == 2)
             search_directory(temp);
-        } else if (entry_type == 1) {
-            if (strstr(entry->d_name, ".txt")) {
+        else if (entry_type == 1)
+            if (strstr(entry->d_name, ".txt"))
                 read_text(temp);
-            }
-        }
     }
     closedir(dp);
 }
 
-void read_text(char *dir_path) {
-    int fd = open(dir_path, O_RDONLY);
+void read_text(const char *pathname) {
+    int fd = open(pathname, O_RDONLY);
 
     if (fd < 0) {
-        perror(dir_path);
+        perror(pathname);
         return;
     }
 
@@ -119,7 +119,12 @@ void read_text(char *dir_path) {
 }
 
 void count(char *text) {
-    
+    // word delimiters
+        // ' can occur anywhere in a word
+        // - must be sandwiched by letters
+            // "-foo" and "foo-" are considered "foo", "foo--bar" would be "foo" and "bar"
+        // numbers, whitespace, and other punctuation are delimiters
+            // "a2z" is considered "a" and "z"
 }
 
 int main(int argc, char **argv) {
