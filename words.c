@@ -16,12 +16,13 @@
 int get_entry_type(const char* pathname);
 void search_directory(const char *pathname);
 void read_text(const char *pathname);
+int has_double_dash(char *text);
 void add_to_words(char *text);
 
 /* GLOBALS */
 char *delimiters = "`1234567890=~!@#$%^&*()_+[]{}\\|:;\",./<>?";
 char **words;
-int total_word_count;
+int total_word_count;   
 
 int get_entry_type(const char *pathname) {
     struct stat sbuf;
@@ -126,6 +127,28 @@ void read_text(const char *pathname) {
     if (line) {
         add_to_words(line);
     }
+    free(line);
+}
+
+int has_double_dash(char *text) {
+    char *pos = strstr(text, "--");
+
+    if (pos) {
+        size_t len1 = pos - text;
+        char str1[len1];
+        char str2[strlen(text) - len1 - 1];
+        strncpy(str1, text , len1);
+        str1[len1] = '\0';
+        // 2 = strlen("--")
+        strcpy(str2, pos + 2);
+
+        add_to_words(str1);
+        add_to_words(str2);
+
+        return 1;
+    }
+    
+    return 0;
 }
 
 void add_to_words(char *text) {
@@ -137,22 +160,31 @@ void add_to_words(char *text) {
             // "-foo" and "foo-" are considered "foo", "foo--bar" would be "foo" and "bar"
         // numbers, whitespace, and other punctuation are delimiters
             // "a2z" is considered "a" and "z"
-
     
+    // Check for "--" delimiter
+    if (has_double_dash(text)) return;
+    
+    // Check if string begins or ends with a "-" and remove it
+    if (text[0] == '-')
+        text++;
+    else if (text[strlen(text)-1] == '-')
+        text[strlen(text)-1] = '\0';
+    
+    char *token = NULL;
 
-    text = strtok(text, delimiters);
+    token = strtok(text, delimiters);
 
-    while (text != NULL) {
+    while (token != NULL) {
         int len = strlen(text);
 
         // Dynamic sizing array...
         words = realloc(words, sizeof(char *) * total_word_count + 2);
         words[total_word_count] = malloc(len + 1);
 
-        strcpy(words[total_word_count], text);
+        strcpy(words[total_word_count], token);
         total_word_count++;
 
-        text = strtok(NULL, delimiters);
+        token = strtok(NULL, delimiters);
     }
 }
 
@@ -166,5 +198,6 @@ int main(int argc, char **argv) {
         printf("%s\n", words[i]);
     }
 
+    free(words);
     return EXIT_SUCCESS;
 }
