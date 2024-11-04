@@ -7,6 +7,6 @@ This program is made to take in multiple arguments when they are all directories
 Our testing strategy for this was to make a directory with files inside and outside of it that would have .txt files or not, and handcount the iterations of each word and compare to what we got. We would test by trying different ways that would seperate words whether it be grammar, or numbers, spaces, etc. A specific case we would test for is words with a double dash in them, as we made a function to specifically test for it. Our tests really focus on checking if the program is functional. 
 
 ## HOW TO RUN
-\$ make\n
-\$ ./words PATH/TO/DIRECTORY PATH/TO/FILE\n
+\$ make\
+\$ ./words PATH/TO/DIRECTORY PATH/TO/FILE\
 \$ make clean
