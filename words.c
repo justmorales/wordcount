@@ -13,20 +13,23 @@
 #define DEBUG 0
 #endif
 
-/* FUNCTION DECLARATIONS */
-int get_entry_type(const char* pathname);
-void search_directory(const char *pathname);
-void read_text(const char *pathname);
-int has_double_dash(char *text);
-void add_to_words(char *text);
-void to_lowercase(char *str);
-void count_Words(char **input, int size);
-
-
 /* GLOBALS */
 char *delimiters = "`1234567890=~!@#$%^&*()_+[]{}\\|:;\",./<>?";
 char **words;
 int total_word_count;   
+typedef struct {
+    char *word;
+    int count;
+} WordCount;
+
+/* FUNCTION DECLARATIONS */
+int get_entry_type(const char* pathname);
+void search(const char *pathname);
+void read_text(const char *pathname);
+int has_double_dash(char *text);
+void add_to_words(char *text);
+int find_word(WordCount words[], int size, char *word);
+void count_words(char **input, int size);
 
 int get_entry_type(const char *pathname) {
     struct stat sbuf;
@@ -46,13 +49,15 @@ int get_entry_type(const char *pathname) {
         return -1;
 }
 
-void search_directory(const char *pathname) {
+void search(const char *pathname) {
     struct dirent *entry;
     DIR *dp = opendir(pathname);
 
-    if (dp == NULL) {
+    if (get_entry_type(pathname) == 1)
+        read_text(pathname);
+
+    if (dp == NULL)
         return;
-    }
 
     // Traverse through entire directory
     // traverse through entire directory
@@ -64,14 +69,12 @@ void search_directory(const char *pathname) {
 
         // Store full pathname in a temp string
         char temp[1024];
-        strcpy(temp, pathname);
-        strcat(temp, "/");
-        strcat(temp, entry->d_name);
+        sprintf(temp, "%s/%s", pathname, entry->d_name);
 
         int entry_type = get_entry_type(temp);
         // If entry is a directory, search that subdirectory
         if (entry_type == 2)
-            search_directory(temp);
+            search(temp);
         // If entry is a regular file, check if it's a text file
         else if (entry_type == 1)
             if (strstr(entry->d_name, ".txt"))
@@ -181,8 +184,6 @@ void add_to_words(char *text) {
     while (token != NULL) {
         int len = strlen(token);
 
-        // Convert each token to lowercase before storing
-        to_lowercase(token);  
         // Dynamic sizing array...
         words = realloc(words, sizeof(char *) * total_word_count + 2);
         words[total_word_count] = malloc(len + 1);
@@ -194,9 +195,39 @@ void add_to_words(char *text) {
     }
 }
 
-void to_lowercase(char *str) {
-    for (int i = 0; str[i]; i++) {
-        str[i] = tolower(str[i]);
+int find_word(WordCount words[], int size, char *word) {
+    for (int i = 0; i < size; i++) {
+        if (strcmp(words[i].word, word) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void count_words(char **input, int size) {
+    WordCount words[total_word_count];
+    int uniqueWords = 0;
+
+    for (int i = 0; i < size; i++) {
+        int index = find_word(words, uniqueWords, input[i]);
+
+        if (index != -1) {
+            words[index].count++;  // Increase the count if word already exists
+        } else {
+            words[uniqueWords].word = malloc(strlen(input[i]) + 1);  
+            if (words[uniqueWords].word == NULL) {
+                fprintf(stderr, "Memory allocation failed\n");
+                exit(1);
+            }
+            strcpy(words[uniqueWords].word, input[i]);
+            words[uniqueWords].count = 1;
+            uniqueWords++;
+        }
+    }
+    
+    for (int i = 0; i < uniqueWords; i++) {
+        printf("%s: %d\n", words[i].word, words[i].count);
+        free(words[i].word);  // Free allocated memory for each word
     }
 }
 
@@ -204,11 +235,14 @@ int main(int argc, char **argv) {
     words = NULL;
     total_word_count = 0;
 
-    search_directory(argv[1]);
+    printf("argc: %d\n", argc);
+    for (int i = 1; i < argc; i++)
+        search(argv[i]);
 
-    for (int i = 0; i < total_word_count; i++) {
-        printf("%s\n", words[i]);
-    }
+    // for (int i = 0; i < total_word_count; i++) {
+    //     printf("%s\n", words[i]);
+    // }
+    count_words(words, total_word_count);
 
     free(words);
     return EXIT_SUCCESS;
