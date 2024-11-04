@@ -28,53 +28,6 @@ char *delimiters = "`1234567890=~!@#$%^&*()_+[]{}\\|:;\",./<>?";
 char **words;
 int total_word_count;   
 
-//creating a struct to count the # of a word found
-typedef struct {
-    char *word;
-    int count;
-} WordCount;
-
-// finding the word in the array given after the 
-int findWord(WordCount words[], int size, char *word) {
-    for (int i = 0; i < size; i++) {
-        if (strcmp(words[i].word, word) == 0) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-// counting up the words in the array
-void count_Words(char **input, int size) {
-    WordCount words[total_word_count];
-    int uniqueWords = 0;
-
-    for (int i = 0; i < size; i++) {
-        to_lowercase(input[i]);  // Convert to lowercase before finding or adding
-        int index = findWord(words, uniqueWords, input[i]);
-
-        if (index != -1) {
-            words[index].count++;  // Increase the count if word already exists
-        } else {
-            words[uniqueWords].word = malloc(strlen(input[i]) + 1);  
-            if (words[uniqueWords].word == NULL) {
-                fprintf(stderr, "Memory allocation failed\n");
-                exit(1);
-            }
-            strcpy(words[uniqueWords].word, input[i]);
-            words[uniqueWords].count = 1;
-            uniqueWords++;
-        }
-    }
-
-    printf("Word Counts:\n");
-    for (int i = 0; i < uniqueWords; i++) {
-        printf("%s: %d\n", words[i].word, words[i].count);
-        free(words[i].word);  // Free allocated memory for each word
-    }
-}
-
-//check if its a regular file or directory
 int get_entry_type(const char *pathname) {
     struct stat sbuf;
     int r = stat(pathname, &sbuf);
@@ -97,33 +50,32 @@ void search_directory(const char *pathname) {
     struct dirent *entry;
     DIR *dp = opendir(pathname);
 
-    
-
     if (dp == NULL) {
         return;
     }
 
+    // Traverse through entire directory
     // traverse through entire directory
     while ((entry = readdir(dp)) != NULL) {
-        //exclude entries starting with .
+        // Exclude entries that start with .
         if (strncmp(entry->d_name, ".", 1) == 0) {
             continue;
         }
 
-        //store full pathname in temp string
+        // Store full pathname in a temp string
         char temp[1024];
         strcpy(temp, pathname);
         strcat(temp, "/");
         strcat(temp, entry->d_name);
 
         int entry_type = get_entry_type(temp);
-        
         // If entry is a directory, search that subdirectory
         if (entry_type == 2)
             search_directory(temp);
         // If entry is a regular file, check if it's a text file
-        else if (entry_type == 1 && strstr(entry->d_name, ".txt"))
-            read_text(temp);
+        else if (entry_type == 1)
+            if (strstr(entry->d_name, ".txt"))
+                read_text(temp);
     }
     closedir(dp);
 }
@@ -169,6 +121,7 @@ void read_text(const char *pathname) {
         if (seg_start < pos) {
             int seg_len = pos - seg_start;
             line = realloc(line, line_len + seg_len + 1);
+            
             memcpy(line + line_len, buf + seg_start, seg_len);
             line_len += seg_len;
             line[line_len] = '\0';
@@ -213,9 +166,8 @@ void add_to_words(char *text) {
             // "a2z" is considered "a" and "z"
     
     // Check for "--" delimiter
-
     if (has_double_dash(text)) return;
-
+    
     // Check if string begins or ends with a "-" and remove it
     if (text[0] == '-')
         text++;
@@ -253,11 +205,10 @@ int main(int argc, char **argv) {
     total_word_count = 0;
 
     search_directory(argv[1]);
-    count_Words(words, total_word_count);
 
-    // for (int i = 0; i < total_word_count; i++) {
-    //     printf("%s\n", words[i]);
-    // }
+    for (int i = 0; i < total_word_count; i++) {
+        printf("%s\n", words[i]);
+    }
 
     free(words);
     return EXIT_SUCCESS;
